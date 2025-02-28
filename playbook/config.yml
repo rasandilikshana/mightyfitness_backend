@@ -4,8 +4,8 @@
   roles:
     - role: config
   vars:
-    mysql_root_password: "root"
+    mysql_root_password: "HunRas@@0246!!"
     mysql_db_name: "fitness_mighty"
-    mysql_user: "root"
-    mysql_password: "root"
+    mysql_user: "nichiren_user"
+    mysql_password: "Hunknichi@@738@!"
     target_directory: "/var/www/laravel"
