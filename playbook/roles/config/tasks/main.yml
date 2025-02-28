@@ -1,0 +1,289 @@
+- name: Update and upgrade apt packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: Add repository for PHP 8.1
+  apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install required packages
+  apt:
+    name:
+      - software-properties-common
+      - curl
+    state: present
+
+- name: Ensure necessary packages are installed
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - python3-dev
+    - libmysqlclient-dev
+    - python3-pip
+    - pkg-config
+    - build-essential
+    - acl
+
+- name: Install mysqlclient package
+  pip:
+    name: mysqlclient
+
+- name: Install MySQL server
+  apt:
+    name: mysql-server
+    state: present
+
+- name: Ensure MySQL service is started and enabled
+  service:
+    name: mysql
+    state: started
+    enabled: yes
+
+- name: Create Laravel database
+  community.mysql.mysql_db:
+    name: "{{ mysql_db_name }}"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Create Laravel user with necessary privileges
+  community.mysql.mysql_user:
+    name: "{{ mysql_user }}"
+    password: "{{ mysql_password }}"
+    priv: "{{ mysql_db_name }}.*:ALL"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Install PHP 8.1 and common extensions
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - php8.1
+    - php8.1-cli
+    - php8.1-fpm
+    - php8.1-mysql
+    - php8.1-xml
+    - php8.1-mbstring
+    - php8.1-curl
+    - php8.1-zip
+    - php8.1-gd
+
+- name: Ensure PHP-FPM service is started and enabled
+  service:
+    name: php8.1-fpm
+    state: started
+    enabled: yes
+
+- name: Install Nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Stop any service that might conflict with Nginx on port 80
+  service:
+    name: "{{ item }}"
+    state: stopped
+  loop:
+    - apache2
+    - httpd
+  ignore_errors: yes
+
+- name: Disable any service that might conflict with Nginx on port 80
+  service:
+    name: "{{ item }}"
+    enabled: no
+  loop:
+    - apache2
+    - httpd
+  ignore_errors: yes
+
+- name: Copy Laravel project files to server
+  synchronize:
+    src: ../../../../
+    dest: "{{ target_directory }}"
+    delete: yes
+
+- name: Install Composer
+  get_url:
+    url: https://getcomposer.org/installer
+    dest: /tmp/composer-setup.php
+
+- name: Install Composer globally
+  command: php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+
+- name: Install Laravel dependencies
+  command: composer install --no-interaction --ignore-platform-reqs
+  args:
+    chdir: "{{ target_directory }}"
+
+- name: Install required packages for building Node.js
+  apt:
+    name: build-essential
+    state: present
+
+- name: Download Node.js 21.7.3 tarball
+  get_url:
+    url: "https://nodejs.org/dist/v21.7.3/node-v21.7.3-linux-x64.tar.xz"
+    dest: "/tmp/node-v21.7.3-linux-x64.tar.xz"
+
+- name: Extract Node.js tarball
+  unarchive:
+    src: "/tmp/node-v21.7.3-linux-x64.tar.xz"
+    dest: "/usr/local"
+    remote_src: yes
+    creates: "/usr/local/node-v21.7.3-linux-x64"
+
+- name: Create symbolic links for node and npm
+  file:
+    src: "/usr/local/node-v21.7.3-linux-x64/bin/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    state: link
+  loop:
+    - node
+    - npm
+
+- name: Verify Node.js installation
+  command: node -v
+  register: node_version
+
+- name: Display Node.js version
+  debug:
+    msg: "Node.js version is {{ node_version.stdout }}"
+
+- name: Run npm install in {{ target_directory }}
+  npm:
+    path: "{{ target_directory }}"
+    state: present
+    production: no
+  environment:
+    NODE_ENV: development
+
+- name: Set Laravel environment variables in .env file
+  lineinfile:
+    path: "{{ target_directory }}/.env"
+    regexp: '^DB_{{ item.key }}='
+    line: "DB_{{ item.key }}={{ item.value }}"
+  loop:
+    - { key: 'DATABASE', value: "{{ mysql_db_name }}" }
+    - { key: 'USERNAME', value: "{{ mysql_user }}" }
+    - { key: 'PASSWORD', value: "{{ mysql_password }}" }
+
+- name: Generate Laravel application key
+  command: php artisan key:generate
+  args:
+    chdir: "{{ target_directory }}"
+
+# - name: Run Laravel database migrations and seed database
+#   command: php artisan migrate:fresh --seed
+#   args:
+#     chdir: "{{ target_directory }}"
+
+- name: Create symbolic link for Laravel storage
+  command: php artisan storage:link
+  args:
+    chdir: "{{ target_directory }}"
+
+- name: Clear compiled classes
+  command: php artisan clear-compiled
+  args:
+    chdir: "{{ target_directory }}"
+  ignore_errors: yes
+
+- name: Optimize and clear cache
+  command: php artisan optimize:clear -q
+  args:
+    chdir: "{{ target_directory }}"
+  ignore_errors: yes
+
+- name: Cache configuration
+  command: php artisan config:cache -q
+  args:
+    chdir: "{{ target_directory }}"
+  ignore_errors: yes
+
+- name: Cache views
+  command: php artisan view:cache -q
+  args:
+    chdir: "{{ target_directory }}"
+  ignore_errors: yes
+
+- name: Run database migrations
+  command: php artisan migrate --force
+  args:
+    chdir: "{{ target_directory }}"
+
+- name: Download Adminer
+  get_url:
+    url: https://github.com/vrana/adminer/releases/download/v4.8.1/adminer-4.8.1.php
+    dest: /var/www/html/adminer.php
+
+- name: Set correct permissions for Adminer
+  file:
+    path: /var/www/html/adminer.php
+    owner: www-data
+    group: www-data
+    mode: '0644'
+
+- name: Ensure user 'sjors' exists
+  user:
+    name: sjors
+    state: present
+
+- name: Add user to www-data group
+  user:
+    name: sjors
+    groups: www-data
+    append: yes
+
+- name: Set default ACL for new files in project directory
+  command: sudo find -L "{{ target_directory }}" -type d -not -path "*/vendor/*" -not -path "*/node_modules/*" -exec setfacl --default -m g::rwX {} \;
+
+- name: Set permissions for existing files to 664
+  command: sudo find -L "{{ target_directory }}" -type f -not -path "*/vendor/*" -not -path "*/node_modules/*" -exec chmod 664 {} \;
+
+- name: Change owner and group of existing files
+  command: sudo find -L "{{ target_directory }}" -type f -not -path "*/vendor/*" -not -path "*/node_modules/*" -exec chown "sjors":"www-data" {} \;
+
+- name: Set permissions for existing directories to 2775
+  command: sudo find -L "{{ target_directory }}" -type d -not -path "*/vendor/*" -not -path "*/node_modules/*" -exec chmod 2775 {} \;
+
+- name: Change owner and group of existing directories
+  command: sudo find -L "{{ target_directory }}" -type d -not -path "*/vendor/*" -not -path "*/node_modules/*" -exec chown "sjors":"www-data" {} \;
+
+- name: Copy SSL certificate and key
+  copy:
+    src: ./nginx/certificate.crt
+    dest: /etc/ssl/certs/certificate.crt
+
+- name: Copy private key
+  copy:
+    src: ./nginx/private.key
+    dest: /etc/ssl/private/private.key
+
+- name: Copy Nginx configuration file
+  copy:
+    src: ./nginx/nginx.conf
+    dest: /etc/nginx/sites-available/laravel
+
+- name: Enable Nginx site
+  file:
+    src: /etc/nginx/sites-available/laravel
+    dest: /etc/nginx/sites-enabled/laravel
+    state: link
+
+- name: Test Nginx configuration
+  command: nginx -t
+
+- name: Restart Nginx
+  service:
+    name: nginx
+    state: restarted
