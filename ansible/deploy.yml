@@ -1,0 +1,70 @@
+- name: Deploy Fit360
+  hosts: web
+  become: yes
+  tasks:
+    - name: Update System Packages
+      apt:
+        update_cache: yes
+
+    - name: Install Dependencies
+      apt:
+        name:
+          - php8.0
+          - php8.0-fpm
+          - php8.0-mysql
+          - php8.0-xml
+          - php8.0-mbstring
+          - php8.0-bcmath
+          - php8.0-zip
+          - unzip
+          - curl
+          - git
+          - nginx
+          - mysql-client
+        state: present
+
+    - name: Pull Latest Code
+      git:
+        repo: "git@github.com:rasandilikshana/mightyfitness_backend.git"
+        dest: /var/www/fit360
+        version: main
+        force: yes
+
+    - name: Set File Permissions
+      file:
+        path: /var/www/fit360
+        owner: www-data
+        group: www-data
+        mode: '0755'
+        recurse: yes
+
+    - name: Install Composer Dependencies
+      command: composer install --no-dev --optimize-autoloader
+      args:
+        chdir: /var/www/fit360
+
+    - name: Set Environment Variables
+      template:
+        src: env.j2
+        dest: /var/www/fit360/.env
+      notify: Restart PHP-FPM
+
+    - name: Run Database Migrations
+      command: php artisan migrate --force
+      args:
+        chdir: /var/www/fit360
+
+    - name: Clear Cache
+      command: php artisan config:clear
+      args:
+        chdir: /var/www/fit360
+
+    - name: Restart PHP-FPM
+      service:
+        name: php8.0-fpm
+        state: restarted
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
