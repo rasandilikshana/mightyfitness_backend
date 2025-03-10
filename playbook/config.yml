@@ -1,0 +1,11 @@
+- name: Server Config
+  hosts: app_instance
+  become: true
+  roles:
+    - role: config
+  vars:
+    mysql_root_password: "root"
+    mysql_db_name: "fitness_mighty"
+    mysql_user: "root"
+    mysql_password: "root"
+    target_directory: "/var/www/laravel"
