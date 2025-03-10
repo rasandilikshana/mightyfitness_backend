@@ -83,7 +83,7 @@
     mysql -e "FLUSH PRIVILEGES;"
   args:
     executable: /bin/bash
-    
+
 - name: Install PHP 8.1 and common extensions
   apt:
     name: "{{ item }}"
@@ -143,7 +143,7 @@
   command: php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
 - name: Install Laravel dependencies
-  command: composer install --no-interaction --ignore-platform-reqs
+  command: composer update --no-interaction --ignore-platform-reqs
   args:
     chdir: "{{ target_directory }}"
 
