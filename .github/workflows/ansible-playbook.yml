@@ -1,20 +1,22 @@
 name: Run Ansible Playbook
-
 on:
   push:
     branches:
       - main
-
 jobs:
   run-ansible-playbook:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Run playbook
-      uses: dawidd6/action-ansible-playbook@v2
-      with:
-        playbook: config.yml
-        directory: playbook/
+      - name: Install Ansible dependencies
+        run: |
+          pip install ansible
+          ansible-galaxy collection install community.mysql
+
+      - name: Run playbook
+        uses: dawidd6/action-ansible-playbook@v2
+        with:
+          playbook: config.yml
+          directory: playbook/

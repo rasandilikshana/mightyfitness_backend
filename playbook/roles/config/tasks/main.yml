@@ -35,12 +35,6 @@
   pip:
     name: mysqlclient
 
-- name: Install required Ansible collections
-  command: ansible-galaxy collection install community.mysql
-  delegate_to: localhost
-  run_once: true
-  changed_when: false
-
 - name: Install MySQL server
   apt:
     name: mysql-server
