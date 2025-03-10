@@ -53,6 +53,14 @@
     login_user: root
     login_password: "{{ mysql_root_password }}"
 
+- name: Create user directly via SQL
+  shell: |
+    mysql -u root -p{{ mysql_root_password }} -e "CREATE USER IF NOT EXISTS '{{ mysql_user }}'@'localhost' IDENTIFIED BY '{{ mysql_password }}';"
+    mysql -u root -p{{ mysql_root_password }} -e "GRANT ALL PRIVILEGES ON {{ mysql_db_name }}.* TO '{{ mysql_user }}'@'localhost';"
+    mysql -u root -p{{ mysql_root_password }} -e "FLUSH PRIVILEGES;"
+  args:
+    executable: /bin/bash
+
 - name: Create Laravel user with necessary privileges
   community.mysql.mysql_user:
     name: "{{ mysql_user }}"
