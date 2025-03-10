@@ -35,6 +35,12 @@
   pip:
     name: mysqlclient
 
+- name: Install required Ansible collections
+  command: ansible-galaxy collection install community.mysql
+  delegate_to: localhost
+  run_once: true
+  changed_when: false
+
 - name: Install MySQL server
   apt:
     name: mysql-server
@@ -58,9 +64,11 @@
     name: "{{ mysql_user }}"
     password: "{{ mysql_password }}"
     priv: "{{ mysql_db_name }}.*:ALL"
+    host: 'localhost'
     state: present
     login_user: root
     login_password: "{{ mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
 
 - name: Install PHP 8.1 and common extensions
   apt:
@@ -253,7 +261,7 @@
     weekday: "*"
     job: "cd {{ target_directory }} && php artisan schedule:run >> /dev/null 2>&1"
     user: "www-data"
-    
+
 - name: Configure Fail2Ban
   copy:
     content: |
