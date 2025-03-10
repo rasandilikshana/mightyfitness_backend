@@ -204,6 +204,16 @@
   args:
     chdir: "{{ target_directory }}"
 
+- name: Set Laravel storage and bootstrap directory permissions
+  file:
+    path: "{{ target_directory }}/{{ item.path }}"
+    state: directory
+    mode: "{{ item.mode }}"
+    recurse: "{{ item.recurse | default(false) }}"
+  loop:
+    - { path: 'bootstrap', mode: '0775', recurse: false }
+    - { path: 'storage', mode: '0775', recurse: true }
+
 - name: Install Redis
   apt:
     name: redis-server
@@ -233,6 +243,17 @@
     dest: /etc/supervisor/conf.d/laravel-queue.conf
   notify: Restart Supervisor
 
+- name: Set up cron job for Laravel scheduler
+  cron:
+    name: "Laravel Scheduler"
+    minute: "*"
+    hour: "*"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "cd {{ target_directory }} && php artisan schedule:run >> /dev/null 2>&1"
+    user: "www-data"
+    
 - name: Configure Fail2Ban
   copy:
     content: |
@@ -263,6 +284,12 @@
     - "22"
     - "80"
     - "443"
+
+- name: Install private key
+  copy:
+    src: ./nginx/private.key
+    dest: /etc/ssl/private/private.key
+    mode: '0600'
 
 - name: Install SSL certificate
   copy:
