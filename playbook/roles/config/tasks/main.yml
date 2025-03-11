@@ -470,6 +470,8 @@
 - name: Ensure proper permissions on SSL files
   file:
     path: "{{ item.path }}"
+    owner: root
+    group: root
     mode: "{{ item.mode }}"
   loop:
     - { path: '/etc/ssl/private/private.key', mode: '0600' }
@@ -483,7 +485,18 @@
     owner: www-data
     group: www-data
 
-- name: Restart Nginx with a delay
+- name: Test Nginx configuration before restarting
+  command: nginx -t
+  register: nginx_config_test
+  ignore_errors: yes
+
+- name: Display Nginx configuration test results
+  debug:
+    var: nginx_config_test.stderr_lines
+  when: nginx_config_test.rc != 0
+
+- name: Restart Nginx only if configuration is valid
   service:
     name: nginx
     state: restarted
+  when: nginx_config_test.rc == 0
