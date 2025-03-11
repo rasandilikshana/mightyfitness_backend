@@ -369,7 +369,7 @@
   apt:
     name: fail2ban
     state: present
-    
+
 - name: Configure Fail2Ban
   copy:
     content: |
@@ -427,7 +427,63 @@
     dest: /etc/nginx/sites-enabled/laravel
     state: link
 
-- name: Restart Nginx
+- name: Test Nginx configuration
+  command: nginx -t
+  register: nginx_config_test
+  ignore_errors: yes
+
+- name: Display Nginx configuration test results
+  debug:
+    var: nginx_config_test.stderr_lines
+  when: nginx_config_test.rc != 0
+
+- name: Ensure SSL directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/ssl/private
+    - /etc/ssl/certs
+
+- name: Check if SSL files exist
+  stat:
+    path: "{{ item }}"
+  register: ssl_files
+  loop:
+    - /etc/ssl/private/private.key
+    - /etc/ssl/certs/certificate.crt
+
+- name: Display SSL file status
+  debug:
+    msg: "{{ item.item }} exists: {{ item.stat.exists }}"
+  loop: "{{ ssl_files.results }}"
+
+- name: Create a self-signed SSL certificate if missing
+  command: >
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048
+    -keyout /etc/ssl/private/private.key
+    -out /etc/ssl/certs/certificate.crt
+    -subj "/CN=fit360.lk"
+  when: not ssl_files.results[0].stat.exists or not ssl_files.results[1].stat.exists
+
+- name: Ensure proper permissions on SSL files
+  file:
+    path: "{{ item.path }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: '/etc/ssl/private/private.key', mode: '0600' }
+    - { path: '/etc/ssl/certs/certificate.crt', mode: '0644' }
+
+- name: Ensure Laravel public directory exists
+  file:
+    path: /var/www/laravel/public
+    state: directory
+    mode: '0755'
+    owner: www-data
+    group: www-data
+
+- name: Restart Nginx with a delay
   service:
     name: nginx
     state: restarted
