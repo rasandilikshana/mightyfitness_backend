@@ -300,15 +300,17 @@
   args:
     chdir: "{{ target_directory }}"
 
-- name: Set Laravel storage and bootstrap directory permissions
+- name: Ensure Laravel storage and bootstrap directories have correct permissions
   file:
     path: "{{ target_directory }}/{{ item.path }}"
     state: directory
     mode: "{{ item.mode }}"
-    recurse: "{{ item.recurse | default(false) }}"
+    recurse: yes
+    owner: www-data
+    group: www-data
   loop:
-    - { path: 'bootstrap', mode: '0775', recurse: false }
-    - { path: 'storage', mode: '0775', recurse: true }
+    - { path: 'bootstrap', mode: '0775' }
+    - { path: 'storage', mode: '0775' }
 
 - name: Install Redis
   apt:
