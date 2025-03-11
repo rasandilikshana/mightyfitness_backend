@@ -337,7 +337,11 @@
       redirect_stderr=true
       stdout_logfile=/var/log/laravel-queue.log
     dest: /etc/supervisor/conf.d/laravel-queue.conf
-  notify: Restart Supervisor
+
+- name: Restart Supervisor service
+  service:
+    name: supervisor
+    state: restarted
 
 - name: Set up cron job for Laravel scheduler
   cron:
@@ -350,6 +354,17 @@
     job: "cd {{ target_directory }} && php artisan schedule:run >> /dev/null 2>&1"
     user: "www-data"
 
+- name: Set up cron job for subscription management
+  cron:
+    name: "Subscription Management"
+    minute: "0"
+    hour: "0"
+    day: "*"
+    month: "*"
+    weekday: "*"
+    job: "cd {{ target_directory }} && php artisan subscription:check-expired >> /dev/null 2>&1"
+    user: "www-data"
+
 - name: Configure Fail2Ban
   copy:
     content: |
@@ -360,7 +375,11 @@
       [sshd]
       enabled = true
     dest: /etc/fail2ban/jail.local
-  notify: Restart Fail2Ban
+
+- name: Restart Fail2Ban
+  service:
+    name: fail2ban
+    state: restarted
 
 - name: Install UFW
   apt:
