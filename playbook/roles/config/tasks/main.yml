@@ -365,6 +365,11 @@
     job: "cd {{ target_directory }} && php artisan subscription:check-expired >> /dev/null 2>&1"
     user: "www-data"
 
+- name: Install Fail2Ban
+  apt:
+    name: fail2ban
+    state: present
+    
 - name: Configure Fail2Ban
   copy:
     content: |
