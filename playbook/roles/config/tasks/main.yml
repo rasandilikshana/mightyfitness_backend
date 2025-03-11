@@ -189,6 +189,79 @@
   environment:
     NODE_ENV: development
 
+- name: Copy .env.example to .env if .env doesn't exist
+  copy:
+    src: "{{ target_directory }}/.env.example"
+    dest: "{{ target_directory }}/.env"
+    force: no
+    remote_src: yes
+  ignore_errors: yes
+
+- name: Create .env file if it doesn't exist and .env.example is missing
+  copy:
+    content: |
+      APP_NAME="Fit360"
+      APP_ENV=prod
+      APP_KEY=base64:I90tq3rmNWbCrDIjssWBl3dYrQZ9rf9Ils44hrLTR+A=
+      APP_DEBUG=true
+      APP_URL=https://fit360.lk
+      APP_DEMO=false
+
+      LOG_CHANNEL=daily
+      LOG_LEVEL=debug
+
+      DB_CONNECTION=mysql
+      DB_HOST=127.0.0.1
+      DB_PORT=3306
+      DB_DATABASE=fitness_mighty
+      DB_USERNAME=root
+      DB_PASSWORD=root
+
+      BROADCAST_DRIVER=log
+      CACHE_DRIVER=file
+      QUEUE_CONNECTION=sync
+      SESSION_DRIVER=file
+      SESSION_LIFETIME=120
+
+      MEMCACHED_HOST=127.0.0.1
+
+      REDIS_HOST=127.0.0.1
+      REDIS_PASSWORD=null
+      REDIS_PORT=6379
+
+      MAIL_MAILER=smtp
+      MAIL_HOST=mailhog
+      MAIL_PORT=1025
+      MAIL_USERNAME=
+      MAIL_PASSWORD=
+      MAIL_ENCRYPTION=
+      MAIL_FROM_ADDRESS=
+      MAIL_FROM_NAME="${APP_NAME}"
+
+      AWS_ACCESS_KEY_ID=
+      AWS_SECRET_ACCESS_KEY=
+      AWS_DEFAULT_REGION=us-east-1
+      AWS_BUCKET=
+
+      PUSHER_APP_ID=
+      PUSHER_APP_KEY=
+      PUSHER_APP_SECRET=
+      PUSHER_APP_CLUSTER=mt1
+
+      MIX_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
+      DEFAULT_LANGUAGE=en
+
+      ONESIGNAL_APP_ID=
+      ONESIGNAL_REST_API_KEY=
+    dest: "{{ target_directory }}/.env"
+    force: no
+  when: st.stat.exists is defined and not st.stat.exists
+
+- name: Check if .env file exists
+  stat:
+    path: "{{ target_directory }}/.env"
+  register: st
+
 - name: Set Laravel environment variables
   lineinfile:
     path: "{{ target_directory }}/.env"
@@ -198,6 +271,7 @@
     - { key: 'DATABASE', value: "{{ mysql_db_name }}" }
     - { key: 'USERNAME', value: "{{ mysql_user }}" }
     - { key: 'PASSWORD', value: "{{ mysql_password }}" }
+  when: st.stat.exists
 
 - name: Generate Laravel application key
   command: php artisan key:generate
